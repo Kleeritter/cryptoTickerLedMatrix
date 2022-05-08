@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecureBearSSL.h>
 #include <Wire.h>
@@ -291,7 +292,10 @@ float changePercent;
 float changePercentbtc;
 float changePercenteth;
 void setup() {
-
+  // put your setup code here, to run once:
+WiFiManager wifiManager;
+//first parameter is name of access point, second is the password
+wifiManager.autoConnect("cryptoLED", "crpassword");
   Serial.begin(115200);
    // Initialize display
   display.begin(16);
