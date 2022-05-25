@@ -1,6 +1,6 @@
 # cryptoTickerLedMatrix
 Display current Crypto Prices on a 32 * 64 Pixel Matrix
-
+[![Demo Doccou alpha](/old/main/show.gif)](https://www.youtube.com/watch?v=ek1j272iAmc)
 ## Hardware
 
 
