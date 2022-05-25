@@ -348,92 +348,14 @@ tor=0;
 
 void loop() {
   // Wait for WiFi connection
-    currentAsset=0;
-    if ((WiFiMulti.run() == WL_CONNECTED)) {
-    // Set the correct fingerprint
 
-    // Setup a https client
-    HTTPClient http;
-    BearSSL::WiFiClientSecure *client = new BearSSL::WiFiClientSecure();
-    BearSSL::CertStore certStore;
-    int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
-    client->setCertStore(&certStore);
-    Serial.println(numCerts);
     
       // DOGE
     // Connect to API
-    if (http.begin(dynamic_cast<WiFiClient&>(*client), assets[currentAsset].url)) {  // HTTPS
-
-      // start connection and send HTTP header
-      Serial.print("HTTPS GET...\n");
-      display.clearDisplay();
-      int httpCode = http.GET();
-      //Serial.print("Balla...\n");
-      // httpCode will be negative on error
-      if (httpCode > 0) {
-        // HTTP header has been send and Server response header has been handled
-        Serial.printf("HTTPS GET... code: %d\n", httpCode);
-
-        // If the HTTP code is valid process and display the data
-        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-          // Store the API payload in a string
-          //DynamicJsonDocument doc(2048);
-          //deserializeJson(doc, http.getString());
-          String payload = http.getString();
-           DynamicJsonDocument doc(1024);
-           deserializeJson(doc, payload);
-           double doge = doc["dogecoin"]["eur"];
-           double doger = doc["dogecoin"]["eur_24h_change"];
-           Serial.println(doge);
-           Serial.println(doger);
-          //payerload = http.GET();
-          //StaticJsonBuffer<200> jsonBuffer;
-          //const char* msg = payload.c_str();
-          //Serial.println(msg);
-          //JsonObject root = doc.as(msg);
-          //Serial.print(payload);
-          //const char* testSuccess = root["bitcoin"];
-          //Serial.println(testSuccess);
-
-
-         
-           //Serial.println(doc["bitcoin"].as<long>());
-           //Serial.print(serializeJson(doc));
-          //String payload = http.GET();
-          //Serial.print(payerload);
-          //Serial.print(payload);
-          // Calculate the price, change and percentage change
-          
-          if(assets[currentAsset].isCrypto){
-              //String payload = http.getString();
-              //Serial.print(payload);
-            price = doge;
-            //Serial.print(pricer);
-            change = doger;
-          }
-
-          Serial.println("DOGE clear");
-               float changePercent = change/price*100;   
-               Serial.println(changePercent);
-        }
-
-      } else {
-        // Warn user using serial and OLED that call failed
-        Serial.printf("[HTTPS] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        display.clearDisplay();
-        display.setTextSize(1);
-        display.setCursor(0, display.height()/4);
-        display.println(F("HTTPS GET failed"));
-        display.print(F("Will retry in a few seconds"));
-        display.setTextSize(1);
-      }
-
-      // Must close the https connection
-      http.end();
-    }
-  
-  
- 
+    
+       
+       String coinname="dogecoin";
+       httprequeste(coinname);
        currentAsset=1;
  
    
@@ -629,4 +551,70 @@ void printChange(float change) {
   display.print(F("%"));
  // display.display();
 }
-      
+
+void httprequeste(String coinname){
+      currentAsset=0;
+    if ((WiFiMulti.run() == WL_CONNECTED)) {
+    // Set the correct fingerprint
+
+    // Setup a https client
+    HTTPClient http;
+    BearSSL::WiFiClientSecure *client = new BearSSL::WiFiClientSecure();
+    BearSSL::CertStore certStore;
+    int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
+    client->setCertStore(&certStore);
+    Serial.println(numCerts);
+if (http.begin(dynamic_cast<WiFiClient&>(*client), assets[currentAsset].url)) {  // HTTPS
+
+      // start connection and send HTTP header
+      Serial.print("HTTPS GET...\n");
+      display.clearDisplay();
+      int httpCode = http.GET();
+
+      if (httpCode > 0) {
+        // HTTP header has been send and Server response header has been handled
+        Serial.printf("HTTPS GET... code: %d\n", httpCode);
+
+        // If the HTTP code is valid process and display the data
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+    
+          String payload = http.getString();
+           DynamicJsonDocument doc(1024);
+           deserializeJson(doc, payload);
+           double doge = doc[coinname]["eur"];
+           double doger = doc[coinname]["eur_24h_change"];
+           Serial.println(doge);
+           Serial.println(doger);
+
+
+
+         
+          
+          if(assets[currentAsset].isCrypto){
+       
+            float price+coinname = doge;
+            float change+coinname = doger;
+          }
+
+          Serial.println("DOGE clear");
+               float changePercent = change/price*100;   
+               Serial.println(changePercent);
+        }
+
+      } else {
+        // Warn user using serial and OLED that call failed
+        Serial.printf("[HTTPS] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setCursor(0, display.height()/4);
+        display.println(F("HTTPS GET failed"));
+        display.print(F("Will retry in a few seconds"));
+        display.setTextSize(1);
+      }
+
+      // Must close the https connection
+      http.end();
+    }  
+  
+}
+}
