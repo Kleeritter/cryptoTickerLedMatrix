@@ -17,7 +17,10 @@
 #include <PxMatrix.h>
 #include <Ticker.h>
 #include <ArduinoJson.h>
-
+#include <CertStoreBearSSL.h>
+#include <time.h>
+#include <FS.h>
+#include <LittleFS.h>
 
 /**** Setup ****/
 
@@ -38,6 +41,25 @@
 #define CURRENCY_CODE "eur"
 // Currency symbol for crypto, tested: letters and $
 #define CURRENCY_SYM 'E'
+
+
+//NTP
+
+void setClock() {
+  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Waiting for NTP time sync: ");
+  time_t now = time(nullptr);
+  while (now < 8 * 3600 * 2) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println("");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Current time: ");
+  Serial.print(asctime(&timeinfo));
+}
 
 // API Bums
 // Fingerprint for api.cryptonator.com - expires 6 Feb 2022
@@ -215,7 +237,7 @@ void IRAM_ATTR display_updater(){
 
 void display_update_enable(bool is_enable)
 {
-
+ 
 #ifdef ESP8266
   if (is_enable)
     display_ticker.attach(0.004, display_updater);
@@ -295,8 +317,13 @@ void setup() {
   // put your setup code here, to run once:
 WiFiManager wifiManager;
 //first parameter is name of access point, second is the password
-wifiManager.autoConnect("cryptoLED", "crpassword");
   Serial.begin(115200);
+  Serial.print("Wifi Connect");
+wifiManager.autoConnect("cryptoLED", "crpassword");
+    setClock();
+    SPIFFS.begin();
+    HTTPClient http;
+
    // Initialize display
   display.begin(16);
   //display.setMuxDelay(0,1,0,0,0);
@@ -324,7 +351,7 @@ wifiManager.autoConnect("cryptoLED", "crpassword");
     // and print info to OLED
     display.clearDisplay();
     display.setCursor(0, display.height()/4);
-    display.print(F("Boot V5.1  "));
+    display.print(F("Boot V5.3  "));
     display.print(t);
     display.display();
     delay(1000);
@@ -350,28 +377,33 @@ void loop() {
       memcpy(fingerprint, fingerprint_stock, 20);
 
     // Setup a https client
-    std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
-    client->setFingerprint(fingerprint);
-    HTTPClient https;
+    HTTPClient http;
+    BearSSL::WiFiClientSecure *client = new BearSSL::WiFiClientSecure();
+    BearSSL::CertStore certStore;
+    int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
+    client->setCertStore(&certStore);
+    Serial.println(numCerts);
+    
       // DOGE
     // Connect to API
-    Serial.print("HTTPS begin...\n");
-    if (https.begin(*client, assets[currentAsset].url)) {  // HTTPS
+    Serial.print("HTTPS begin... bit\n");
+    if (http.begin(dynamic_cast<WiFiClient&>(*client),"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")) {  // HTTPS
 
       // start connection and send HTTP header
       Serial.print("HTTPS GET...\n");
       display.clearDisplay();
-      int httpCode = https.GET();
+      int httpCode = http.GET();
       //Serial.print("Balla...\n");
       // httpCode will be negative on error
       if (httpCode > 0) {
         // HTTP header has been send and Server response header has been handled
-        //Serial.printf("HTTPS GET... code: %d\n", httpCode);
+        Serial.printf("HTTPS GET... code: %d\n", httpCode);
 
         // If the HTTP code is valid process and display the data
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
           // Store the API payload in a string
-          String payload = https.getString();
+          String payload = http.getString();
+          Serial.print(payload);
          // Calculate the price, change and percentage change
           
           if(assets[currentAsset].isCrypto){
@@ -390,7 +422,7 @@ void loop() {
 
       } else {
         // Warn user using serial and OLED that call failed
-        Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        Serial.printf("[HTTPS] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
         display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(0, display.height()/4);
@@ -400,7 +432,7 @@ void loop() {
       }
 
       // Must close the https connection
-      https.end();
+      http.end();
     }
   
   
@@ -411,12 +443,12 @@ void loop() {
          //BTC
           // Connect to API
     Serial.print("HTTPS begin...\n");
-    if (https.begin(*client, assets[currentAsset].url)) {  // HTTPS
+    if (http.begin(*client, assets[currentAsset].url)) {  // HTTPS
 
       // start connection and send HTTP header
       Serial.print("HTTPS GET...\n");
       display.clearDisplay();
-      int httpCode = https.GET();
+      int httpCode = http.GET();
       //Serial.print("Balla...\n");
       // httpCode will be negative on error
       if (httpCode > 0) {
@@ -426,7 +458,7 @@ void loop() {
         // If the HTTP code is valid process and display the data
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
           // Store the API payload in a string
-          String payloadbtc = https.getString();
+          String payloadbtc = http.getString();
          // Calculate the price, change and percentage change
           
           if(assets[currentAsset].isCrypto){
@@ -446,7 +478,7 @@ void loop() {
 
       } else {
         // Warn user using serial and OLED that call failed
-        Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+        Serial.printf("[HTTPS] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
         display.clearDisplay();
         display.setCursor(0, display.height()/4);
         display.println(F("HTTPS GET failed"));
@@ -455,7 +487,7 @@ void loop() {
       }
 
       // Must close the https connection
-      https.end();
+      http.end();
     }
   
   
@@ -467,11 +499,11 @@ void loop() {
    
               // Connect to API
     Serial.print("HTTPS begin...\n");
-    if (https.begin(*client, assets[currentAsset].url)) {  // HTTPS
+    if (http.begin(*client, assets[currentAsset].url)) {  // HTTPS
 
       // start connection and send HTTP header
       Serial.print("HTTPS GET...\n");
-      int httpCode = https.GET();
+      int httpCode = http.GET();
       //Serial.print("Balla...\n");
       // httpCode will be negative on error
       if (httpCode > 0) {
@@ -481,7 +513,7 @@ void loop() {
         // If the HTTP code is valid process and display the data
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
           // Store the API payload in a string
-          String payloadeth = https.getString();
+          String payloadeth = http.getString();
          // Calculate the price, change and percentage change
           
           if(assets[currentAsset].isCrypto){
@@ -500,7 +532,7 @@ void loop() {
       } 
 
       // Must close the https connection
-      https.end();
+      http.end();
     }
   
   Serial.println(changePercenteth);
